@@ -1,6 +1,7 @@
 // Webpack v4
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const path = require("path");
+const webpack = require("webpack");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 
 module.exports = (env, argv) => {
@@ -22,12 +23,6 @@ module.exports = (env, argv) => {
             },
             {
               loader: "css-loader",
-              options: {
-                sourceMap: true,
-              },
-            },
-            {
-              loader: "postcss-loader",
               options: {
                 sourceMap: true,
               },
@@ -82,6 +77,11 @@ module.exports = (env, argv) => {
         // both options are optional
         filename:
           argv.mode === "development" ? "[name].css" : "[name][hash].css",
+      }),
+      new webpack.ProvidePlugin({
+        $: "jquery",
+        jQuery: "jquery",
+        "window.jQuery": "jquery",
       }),
     ],
   };
