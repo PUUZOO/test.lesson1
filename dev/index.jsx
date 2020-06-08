@@ -10,14 +10,18 @@ class CustomChart extends React.Component {
   constructor(props) {
     super(props);
     this.intervalEdit = this.intervalEdit.bind(this);
+    this.timeInterval = this.timeInterval.bind(this);
+    this.addInteval = this.addInteval.bind(this);
     let margin = { top: 20, right: 30, bottom: 100, left: 70 };
     this.state = {
+      dateStart: "",
+      dateEnd: "",
+      timeInterval: 0,
       data: [{ name: "all", value: 0 }],
       margin: margin,
       width: 960 - margin.left - margin.right,
       height: 500 - margin.top - margin.bottom,
       padding: 0.4,
-      water: {},
     };
   }
   chart() {
@@ -65,19 +69,52 @@ class CustomChart extends React.Component {
     return svg.node();
   }
 
+  addInteval() {
+    let data = this.state.data;
+    data.push({ name: `interval${data.length}`, value: 0 });
+    this.setState({ data });
+  }
+
   intervalEdit(e) {
-    let waterAll = this.state.water;
-    let all = 0;
-    let data = [];
+    let data = this.state.data;
+    let allPeriodTime = 0;
 
-    waterAll[e.target.name] = e.target.value;
-    for (let value in waterAll) {
-      all += +waterAll[value];
+    data.map((period, key) => {
+      if (period.name == e.target.name) {
+        data[key].value = +e.target.value;
+      }
+      if (period.name != "all") {
+        allPeriodTime += period.value;
+      }
+    });
+
+    data[0].value = allPeriodTime;
+
+    this.setState({ data: data, d3: this.chart() });
+  }
+
+  timeInterval(e) {
+    this.setState({
+      [e.target.name]: new Date(e.target.value),
+    });
+  }
+
+  componentDidUpdate(prevProps, prevState, snapshot) {
+    if (
+      (prevState.dateStart != this.state.dateStart ||
+        prevState.dateEnd != this.state.dateEnd) &&
+      this.state.dateStart != "" &&
+      this.state.dateEnd != ""
+    ) {
+      this.setState({
+        timeInterval: Math.ceil(
+          Math.abs(
+            this.state.dateEnd.getTime() - this.state.dateStart.getTime()
+          ) /
+            (1000 * 3600 * 24)
+        ),
+      });
     }
-
-    data = [{ name: "all", value: all }];
-    this.setState({ water: waterAll, data: data });
-    this.setState({ d3: this.chart() });
   }
 
   componentDidMount() {
@@ -89,53 +126,65 @@ class CustomChart extends React.Component {
       <div className="container">
         <div className="d-flex flex-column pt-5">
           <div className="row">
-            <div className="col-md-6">
-              <input
-                className="form-control mb-2"
-                placeholder="Период 1"
-                type="number"
-                name="period1"
-                onChange={(e) => {
-                  this.intervalEdit(e);
-                }}
-              />
+            <div className="col-md-4">
+              <div className="mb-2">
+                <label>Дата начала</label>
+                <input
+                  className="form-control"
+                  onChange={(e) => {
+                    this.timeInterval(e);
+                  }}
+                  type="date"
+                  name="dateStart"
+                />
+              </div>
+              <div className="mb-2">
+                <label>Дата окончания</label>
+                <input
+                  className="form-control"
+                  onChange={(e) => {
+                    this.timeInterval(e);
+                  }}
+                  type="date"
+                  name="dateEnd"
+                />
+              </div>
+              <div className="mb-3">
+                {this.state.data.map((period, key) => {
+                  if (period.name != "all") {
+                    return (
+                      <div key={`input-${key}`}>
+                        <label>{`Интервал ${key}`}</label>
+                        <input
+                          className="form-control mb-2"
+                          type="number"
+                          min={0}
+                          max={this.state.timeInterval}
+                          name={`interval${key}`}
+                          onChange={(e) => {
+                            this.intervalEdit(e);
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+                })}
+              </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={this.addInteval}
+                  class="btn btn-secondary w-100 mb-2"
+                >
+                  Добавить интервал
+                </button>
+              </div>
             </div>
-            <div className="col-md-6">
-              <input
-                className="form-control mb-2"
-                placeholder="Период 2"
-                type="number"
-                name="period2"
-                onChange={(e) => {
-                  this.intervalEdit(e);
-                }}
-              />
-            </div>
-            <div className="col-md-6">
-              <input
-                className="form-control mb-2"
-                placeholder="Период 3"
-                type="number"
-                name="period2"
-                onChange={(e) => {
-                  this.intervalEdit(e);
-                }}
-              />
-            </div>
-            <div className="col-md-6">
-              <input
-                className="form-control mb-2"
-                placeholder="Период 4"
-                type="number"
-                name="period4"
-                onChange={(e) => {
-                  this.intervalEdit(e);
-                }}
-              />
+            <div className="col-md-8">
+              <RD3Component data={this.state.d3} />
             </div>
           </div>
         </div>
-        <RD3Component data={this.state.d3} />
       </div>
     );
   }
