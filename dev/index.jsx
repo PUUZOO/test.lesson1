@@ -12,7 +12,7 @@ class CustomChart extends React.Component {
     this.intervalEdit = this.intervalEdit.bind(this);
     this.timeInterval = this.timeInterval.bind(this);
     this.addInteval = this.addInteval.bind(this);
-    let margin = { top: 20, right: 30, bottom: 100, left: 70 };
+    const margin = { top: 0, right: 30, bottom: 100, left: 70 };
     this.state = {
       dateStart: "",
       dateEnd: "",
@@ -24,6 +24,7 @@ class CustomChart extends React.Component {
       padding: 0.4,
     };
   }
+
   chart() {
     let x = d3
       .scaleBand()
@@ -39,34 +40,148 @@ class CustomChart extends React.Component {
       .domain([0, d3.max(this.state.data, (d) => d.value)])
       .nice()
       .range([
-        this.state.height - this.state.margin.bottom,
         this.state.margin.top,
+        this.state.height - this.state.margin.bottom,
       ]);
 
     let xAxis = (g) =>
       g
-        .attr(
-          "transform",
-          `translate(0,${this.state.height - this.state.margin.bottom})`
-        )
+        .attr("transform", `translate(0,${this.state.data[0].value * 10})`)
         .call(d3.axisBottom(x).tickFormat("").tickSizeOuter(0));
+
+    let color = (name) => {
+      let color = "";
+      switch (name) {
+        case "all":
+          color = "#4e81bd";
+          break;
+        case "interval1":
+          color = "#c0504c";
+          break;
+        case "interval2":
+          color = "#93a944";
+          break;
+        case "interval3":
+          color = "#e6dcd7";
+          break;
+        case "interval4":
+          color = "#4aacc6";
+          break;
+        default:
+          color = "gray";
+          break;
+      }
+      return color;
+    };
 
     const svg = d3.create("svg").attr("viewBox", [0, 0, 1000, 1000]);
 
     svg
       .append("g")
-      .attr("fill", "#4e81bd")
       .selectAll("rect")
       .data(this.state.data)
+      .enter()
+      .append("g")
+      .attr("class", "bar")
+      .append("g")
+      .attr("class", "wrapper-bar")
+      .append("rect")
       .join("rect")
-      .attr("x", (d, i) => x(i))
-      .attr("y", (d) => y(d.value))
-      .attr("height", (d) => y(0) - y(d.value))
-      .attr("width", x.bandwidth());
+      .attr("x", (d, i) => {
+        this.updateInterval(i, "x", x(i));
+        return x(i);
+      })
+      .attr("y", (d, i) => {
+        let skipY = 0;
+        let count = 0;
+
+        if (d.name == "all") {
+          this.updateInterval(i, "y", 0);
+          return y(0);
+        }
+        this.state.data.slice(1, i).forEach((x) => {
+          if (count <= i) {
+            skipY += y(x.value);
+            count++;
+          }
+        });
+        if (i > 0) {
+          this.updateInterval(i, "y", skipY * 10);
+          return skipY * 10;
+        }
+      })
+      .attr("height", (d, i) => {
+        this.updateInterval(i, "height", 0 + d.value * 10);
+        return 0 + d.value * 10;
+      })
+      .attr("width", (d, i) => {
+        this.updateInterval(i, "width", x.bandwidth());
+        return x.bandwidth();
+      })
+      .attr("fill", (d) => {
+        return color(d.name);
+      });
+
+    svg
+      .selectAll(".bar")
+      .append("line")
+      .attr("class", "connector")
+      .attr("x1", (d, i) => {
+        if (this.state.data.length > i + 1) {
+          if (d.name == "all") {
+            return d.x;
+          } else {
+            return d.x + d.width;
+          }
+        }
+      })
+      .attr("y1", (d, i) => {
+        if (this.state.data.length > i + 1) {
+          if (d.name == "all") {
+            return 0;
+          } else {
+            return d.y + d.height;
+          }
+        }
+      })
+      .attr("x2", (d, i) => {
+        if (this.state.data.length > i + 1) {
+          return this.state.data[i + 1].x;
+        }
+      })
+      .attr("y2", (d, i) => {
+        if (d.name == "all") {
+          return 0;
+        }
+        if (this.state.data.length > i + 1) {
+          return this.state.data[i + 1].y;
+        }
+      });
+
+    svg
+      .selectAll(".bar g")
+      .append("text")
+      .attr("x", (d) => {
+        return d.x + d.width / 2;
+      })
+      .attr("y", (d) => {
+        return d.y + d.height / 2;
+      })
+      .text(function (d) {
+        return d.value;
+      });
 
     svg.append("g").call(xAxis);
 
+    svg.selectAll("rect");
+
     return svg.node();
+  }
+
+  updateInterval(i, key, result) {
+    let data = this.state.data;
+    data[i][key] = result;
+    this.setState({ data });
   }
 
   addInteval() {
@@ -174,14 +289,16 @@ class CustomChart extends React.Component {
                 <button
                   type="button"
                   onClick={this.addInteval}
-                  class="btn btn-secondary w-100 mb-2"
+                  className="btn btn-secondary w-100 mb-2"
                 >
                   Добавить интервал
                 </button>
               </div>
             </div>
             <div className="col-md-8">
-              <RD3Component data={this.state.d3} />
+              <div className="d3-component">
+                <RD3Component className="" data={this.state.d3} />
+              </div>
             </div>
           </div>
         </div>
