@@ -222,6 +222,16 @@ class CustomChart extends React.Component {
     return allPeriodTime;
   }
 
+  intervalRemainder() {
+    let all = this.state.timeInterval;
+    this.state.data.map((item) => {
+      if (item.name != "all") {
+        all -= item.value;
+      }
+    });
+    return all;
+  }
+
   intervalEdit(e, key) {
     let data = this.state.data;
     let value = e.target.value;
@@ -230,19 +240,15 @@ class CustomChart extends React.Component {
 
     if (value == "") {
       data.splice([key], 1);
-      intervalRemainder =
-        this.state.temporaryValue + this.state.intervalRemainder;
       data[0].value = this.allInterval();
-      this.setState({ data, intervalRemainder, d3: this.chart() });
+      this.setState({ data, d3: this.chart() });
     } else {
       if (value <= this.state.intervalRemainder) {
         let temporaryValue = +value;
-        intervalRemainder = this.state.intervalRemainder - +value;
         data[key].value = +value;
         data[0].value = this.allInterval();
         this.setState({
           data,
-          intervalRemainder,
           temporaryValue,
           d3: this.chart(),
           message: "",
@@ -251,6 +257,8 @@ class CustomChart extends React.Component {
         this.setState({ message: "Введите правильные данные" });
       }
     }
+
+    this.setState({ intervalRemainder: this.intervalRemainder() });
   }
 
   timeInterval(e) {
