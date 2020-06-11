@@ -20,6 +20,7 @@ class CustomChart extends React.Component {
       intervalRemainder: 0,
       data: [{ name: "all", value: 0 }],
       margin: margin,
+      message: "",
       width: 1000,
       height: 600,
       padding: 0.4,
@@ -27,6 +28,7 @@ class CustomChart extends React.Component {
   }
 
   chart() {
+    // Calculate x
     let x = d3
       .scaleBand()
       .domain(d3.range(this.state.data.length))
@@ -36,9 +38,11 @@ class CustomChart extends React.Component {
       ])
       .padding(this.state.padding);
 
+    // Calculate y
     const scale = (commonRange, v) =>
       commonRange ? Math.ceil((this.state.height * v) / commonRange) : 0;
 
+    // Calculate color
     let color = (name) => {
       let color = "";
       switch (name) {
@@ -64,6 +68,7 @@ class CustomChart extends React.Component {
       return color;
     };
 
+    // Create svg box and object
     const svg = d3
       .create("svg")
       .attr("viewBox", [
@@ -73,6 +78,7 @@ class CustomChart extends React.Component {
         this.state.height + this.state.margin.bottom,
       ]);
 
+    // Create bar
     const bar = svg
       .append("g")
       .selectAll("rect")
@@ -123,6 +129,7 @@ class CustomChart extends React.Component {
         return color(d.name);
       });
 
+    // Create horizontal line
     const connector = svg
       .selectAll(".bar")
       .append("line")
@@ -159,6 +166,7 @@ class CustomChart extends React.Component {
         }
       });
 
+    // Add text for bar
     const text = svg
       .selectAll(".bar g")
       .append("text")
@@ -171,6 +179,7 @@ class CustomChart extends React.Component {
       .attr("fill", (d, i) => (!(i % 2) ? "black" : "white"))
       .text((d) => d.value);
 
+    // Add axis x
     const gx = svg
       .append("g")
       .attr(
@@ -196,10 +205,7 @@ class CustomChart extends React.Component {
   addInteval() {
     let data = this.state.data;
     let dataLenght = this.state.data.length;
-    if (
-      (dataLenght - 1 == 0 || data[dataLenght - 1].value != "") &&
-      this.state.intervalRemainder > 0
-    ) {
+    if (dataLenght - 1 == 0 || data[dataLenght - 1].value != "") {
       data.push({ name: `interval${data.length}`, value: "" });
     }
     this.setState({ data });
@@ -219,23 +225,32 @@ class CustomChart extends React.Component {
   intervalEdit(e, key) {
     let data = this.state.data;
     let value = e.target.value;
-    console.log(key);
     let intervalRemainder =
       key == 1 ? this.state.timeInterval : this.state.intervalRemainder;
+
     if (value == "") {
       data.splice([key], 1);
-      intervalRemainder = this.state.intervalRemainder - data[key].value;
+      intervalRemainder =
+        this.state.temporaryValue + this.state.intervalRemainder;
+      data[0].value = this.allInterval();
+      this.setState({ data, intervalRemainder, d3: this.chart() });
     } else {
-      if (this.state.intervalRemainder - value >= 0) {
-        intervalRemainder -= value;
+      if (value <= this.state.intervalRemainder) {
+        let temporaryValue = +value;
+        intervalRemainder = this.state.intervalRemainder - +value;
         data[key].value = +value;
+        data[0].value = this.allInterval();
+        this.setState({
+          data,
+          intervalRemainder,
+          temporaryValue,
+          d3: this.chart(),
+          message: "",
+        });
       } else {
-        intervalRemainder = data[key].value + this.state.intervalRemainder;
-        data.splice([key], 1);
+        this.setState({ message: "Введите правильные данные" });
       }
     }
-    data[0].value = this.allInterval();
-    this.setState({ data, intervalRemainder, d3: this.chart() });
   }
 
   timeInterval(e) {
@@ -331,9 +346,22 @@ class CustomChart extends React.Component {
                 >
                   Добавить интервал
                 </button>
+                {this.state.timeInterval != "" ? (
+                  <small>Выбран период из {this.state.timeInterval} д.</small>
+                ) : (
+                  ""
+                )}
               </div>
             </div>
             <div className="col-md-8">
+              <div
+                className={
+                  this.state.message == "" ? "d-none" : "alert alert-warning"
+                }
+                role="alert"
+              >
+                {this.state.message}
+              </div>
               <div
                 className={
                   this.state.data[0].value > 0 ? "d3-component" : "d-none"
