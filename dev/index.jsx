@@ -12,15 +12,16 @@ class CustomChart extends React.Component {
     this.intervalEdit = this.intervalEdit.bind(this);
     this.timeInterval = this.timeInterval.bind(this);
     this.addInteval = this.addInteval.bind(this);
-    const margin = { top: 0, right: 30, bottom: 100, left: 70 };
+    const margin = { top: 30, right: 30, bottom: 100, left: 70 };
     this.state = {
       dateStart: "",
       dateEnd: "",
       timeInterval: 0,
+      intervalRemainder: 0,
       data: [{ name: "all", value: 0 }],
       margin: margin,
-      width: 960 - margin.left - margin.right,
-      height: 500 - margin.top - margin.bottom,
+      width: 1000,
+      height: 600,
       padding: 0.4,
     };
   }
@@ -35,19 +36,8 @@ class CustomChart extends React.Component {
       ])
       .padding(this.state.padding);
 
-    let y = d3
-      .scaleLinear()
-      .domain([0, d3.max(this.state.data, (d) => d.value)])
-      .nice()
-      .range([
-        this.state.margin.top,
-        this.state.height - this.state.margin.bottom,
-      ]);
-
-    let xAxis = (g) =>
-      g
-        .attr("transform", `translate(0,${this.state.data[0].value * 10})`)
-        .call(d3.axisBottom(x).tickFormat("").tickSizeOuter(0));
+    const scale = (commonRange, v) =>
+      commonRange ? Math.ceil((this.state.height * v) / commonRange) : 0;
 
     let color = (name) => {
       let color = "";
@@ -74,9 +64,16 @@ class CustomChart extends React.Component {
       return color;
     };
 
-    const svg = d3.create("svg").attr("viewBox", [0, 0, 1000, 1000]);
+    const svg = d3
+      .create("svg")
+      .attr("viewBox", [
+        0,
+        0 - this.state.margin.top,
+        this.state.width,
+        this.state.height + this.state.margin.bottom,
+      ]);
 
-    svg
+    const bar = svg
       .append("g")
       .selectAll("rect")
       .data(this.state.data)
@@ -97,22 +94,26 @@ class CustomChart extends React.Component {
 
         if (d.name == "all") {
           this.updateInterval(i, "y", 0);
-          return y(0);
+          return 0;
         }
         this.state.data.slice(1, i).forEach((x) => {
           if (count <= i) {
-            skipY += y(x.value);
+            skipY += x.value;
             count++;
           }
         });
         if (i > 0) {
-          this.updateInterval(i, "y", skipY * 10);
-          return skipY * 10;
+          this.updateInterval(i, "y", scale(this.state.data[0].value, skipY));
+          return scale(this.state.data[0].value, skipY);
         }
       })
       .attr("height", (d, i) => {
-        this.updateInterval(i, "height", 0 + d.value * 10);
-        return 0 + d.value * 10;
+        this.updateInterval(
+          i,
+          "height",
+          scale(this.state.data[0].value, d.value)
+        );
+        return scale(this.state.data[0].value, d.value);
       })
       .attr("width", (d, i) => {
         this.updateInterval(i, "width", x.bandwidth());
@@ -122,7 +123,7 @@ class CustomChart extends React.Component {
         return color(d.name);
       });
 
-    svg
+    const connector = svg
       .selectAll(".bar")
       .append("line")
       .attr("class", "connector")
@@ -140,7 +141,7 @@ class CustomChart extends React.Component {
           if (d.name == "all") {
             return 0;
           } else {
-            return d.y + d.height;
+            return this.state.data[i + 1].y;
           }
         }
       })
@@ -158,20 +159,28 @@ class CustomChart extends React.Component {
         }
       });
 
-    svg
+    const text = svg
       .selectAll(".bar g")
       .append("text")
-      .attr("x", (d) => {
-        return d.x + d.width / 2;
+      .attr("x", (d) => d.x + d.width / 2 - 10)
+      .attr("y", (d, i) => {
+        return i == 0 || (i != 1 && i == this.state.data.length - 1)
+          ? d.y - 5
+          : d.y + d.height / 2;
       })
-      .attr("y", (d) => {
-        return d.y + d.height / 2;
-      })
-      .text(function (d) {
-        return d.value;
-      });
+      .attr("fill", (d, i) => (!(i % 2) ? "black" : "white"))
+      .text((d) => d.value);
 
-    svg.append("g").call(xAxis);
+    const gx = svg
+      .append("g")
+      .attr(
+        "transform",
+        `translate(0,${scale(
+          this.state.data[0].value,
+          this.state.data[0].value
+        )})`
+      )
+      .call(d3.axisBottom(x).tickSizeOuter(0));
 
     svg.selectAll("rect");
 
@@ -186,26 +195,47 @@ class CustomChart extends React.Component {
 
   addInteval() {
     let data = this.state.data;
-    data.push({ name: `interval${data.length}`, value: 0 });
+    let dataLenght = this.state.data.length;
+    if (
+      (dataLenght - 1 == 0 || data[dataLenght - 1].value != "") &&
+      this.state.intervalRemainder > 0
+    ) {
+      data.push({ name: `interval${data.length}`, value: "" });
+    }
     this.setState({ data });
   }
 
-  intervalEdit(e) {
+  allInterval() {
     let data = this.state.data;
     let allPeriodTime = 0;
-
     data.map((period, key) => {
-      if (period.name == e.target.name) {
-        data[key].value = +e.target.value;
-      }
       if (period.name != "all") {
         allPeriodTime += period.value;
       }
     });
+    return allPeriodTime;
+  }
 
-    data[0].value = allPeriodTime;
-
-    this.setState({ data: data, d3: this.chart() });
+  intervalEdit(e, key) {
+    let data = this.state.data;
+    let value = e.target.value;
+    console.log(key);
+    let intervalRemainder =
+      key == 1 ? this.state.timeInterval : this.state.intervalRemainder;
+    if (value == "") {
+      data.splice([key], 1);
+      intervalRemainder = this.state.intervalRemainder - data[key].value;
+    } else {
+      if (this.state.intervalRemainder - value >= 0) {
+        intervalRemainder -= value;
+        data[key].value = +value;
+      } else {
+        intervalRemainder = data[key].value + this.state.intervalRemainder;
+        data.splice([key], 1);
+      }
+    }
+    data[0].value = this.allInterval();
+    this.setState({ data, intervalRemainder, d3: this.chart() });
   }
 
   timeInterval(e) {
@@ -221,13 +251,16 @@ class CustomChart extends React.Component {
       this.state.dateStart != "" &&
       this.state.dateEnd != ""
     ) {
+      let timeInterval = Math.ceil(
+        Math.abs(
+          this.state.dateEnd.getTime() - this.state.dateStart.getTime()
+        ) /
+          (1000 * 3600 * 24) +
+          1
+      );
       this.setState({
-        timeInterval: Math.ceil(
-          Math.abs(
-            this.state.dateEnd.getTime() - this.state.dateStart.getTime()
-          ) /
-            (1000 * 3600 * 24)
-        ),
+        intervalRemainder: timeInterval,
+        timeInterval,
       });
     }
   }
@@ -276,8 +309,9 @@ class CustomChart extends React.Component {
                           min={0}
                           max={this.state.timeInterval}
                           name={`interval${key}`}
+                          value={this.state.data[key].value}
                           onChange={(e) => {
-                            this.intervalEdit(e);
+                            this.intervalEdit(e, key);
                           }}
                         />
                       </div>
@@ -289,15 +323,33 @@ class CustomChart extends React.Component {
                 <button
                   type="button"
                   onClick={this.addInteval}
-                  className="btn btn-secondary w-100 mb-2"
+                  className={
+                    this.state.dateEnd != "" && this.state.dateStart != ""
+                      ? "btn btn-secondary w-100 mb-2"
+                      : "d-none"
+                  }
                 >
                   Добавить интервал
                 </button>
               </div>
             </div>
             <div className="col-md-8">
-              <div className="d3-component">
-                <RD3Component className="" data={this.state.d3} />
+              <div
+                className={
+                  this.state.data[0].value > 0 ? "d3-component" : "d-none"
+                }
+              >
+                <RD3Component data={this.state.d3} />
+              </div>
+              <div
+                className={
+                  this.state.data[0].value > 0
+                    ? "d-none"
+                    : "alert alert-secondary"
+                }
+                role="alert"
+              >
+                Введите данные
               </div>
             </div>
           </div>
